@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice & Hand Control Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            height: 100vh;
+            color: white;
+        }
+
+        .background-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(138, 43, 226, 0.3), transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(30, 144, 255, 0.3), transparent 50%);
+            animation: gradientShift 15s ease infinite;
+            z-index: 0;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .time-display {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+
+        /* App Grid */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 140px));
+            gap: 25px;
+            justify-content: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .app-card {
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 25px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .app-card.hover {
+            transform: translateY(-8px) scale(1.05);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .app-card.selected {
+            transform: translateY(-8px) scale(1.1);
+            background: rgba(100, 255, 100, 0.3);
+            border-color: #00ff00;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.6);
+        }
+
+        .app-icon {
+            font-size: 56px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+
+        .app-name {
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        /* Video Container */
+        #videoContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: #000;
+            z-index: 150;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #handCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        /* Status Panel */
+        .status-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 150;
+        }
+
+        .status-item {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            transition: all 0.3s;
+            min-width: 200px;
+        }
+
+        .status-item.active {
+            background: rgba(34, 197, 94, 0.9);
+            border-color: rgba(34, 197, 94, 1);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+        }
+
+        .status-item.listening {
+            background: rgba(239, 68, 68, 0.9);
+            border-color: rgba(239, 68, 68, 1);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .status-icon {
+            font-size: 18px;
+        }
+
+        .status-text {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Hand Cursor */
+        .hand-cursor {
+            position: fixed;
+            width: 35px;
+            height: 35px;
+            border: 3px solid #00ff00;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+            transition: all 0.08s ease-out;
+            display: none;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .hand-cursor.active {
+            display: block;
+        }
+
+        .hand-cursor.pinch {
+            border-color: #ffff00;
+            background: rgba(255, 255, 0, 0.3);
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+            width: 30px;
+            height: 30px;
+        }
+
+        .hand-cursor.fist {
+            border-color: #ff00ff;
+            background: rgba(255, 0, 255, 0.3);
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.8);
+            width: 40px;
+            height: 40px;
+        }
+
+        .hand-cursor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+        }
+
+        /* Voice Feedback */
+        .voice-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px 50px;
+            border-radius: 25px;
+            font-size: 24px;
+            font-weight: bold;
+            display: none;
+            z-index: 300;
+            border: 3px solid #ff00ff;
+            box-shadow: 0 0 60px rgba(255, 0, 255, 0.6);
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .voice-feedback.show {
+            display: block;
+            animation: feedbackPop 0.3s ease-out;
+        }
+
+        @keyframes feedbackPop {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* Loading */
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border-radius: 20px;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Instructions */
+        .instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 250;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            max-width: 90%;
+        }
+
+        .instructions h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #00ff00;
+        }
+
+        .instructions p {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .instructions button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .instructions button:hover {
+            transform: scale(1.05);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-grid {
+                grid-template-columns: repeat(3, 120px);
+                gap: 20px;
+            }
+
+            .app-card {
+                width: 120px;
+                height: 120px;
+            }
+
+            .app-icon {
+                font-size: 48px;
+            }
+
+            .app-name {
+                font-size: 14px;
+            }
+
+            #videoContainer {
+                width: 150px;
+                height: 112px;
+            }
+
+            .status-panel {
+                left: 10px;
+                bottom: 10px;
+            }
+
+            .status-item {
+                min-width: 170px;
+                padding: 10px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <div id="container">
+        <div class="header">
+            <div class="logo">
+                <span>🎯</span>
+                <span>Smart Dashboard</span>
+            </div>
+            <div class="time-display" id="timeDisplay">00:00</div>
+        </div>
+
+        <div class="main-content">
+            <div class="app-grid" id="appGrid"></div>
+        </div>
+
+        <div id="videoContainer">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="handCanvas"></canvas>
+        </div>
+
+        <div class="status-panel">
+            <div class="status-item" id="handStatus">
+                <span class="status-icon">✋</span>
+                <span class="status-text">มือ: ไม่พบ</span>
+            </div>
+            <div class="status-item" id="voiceStatus">
+                <span class="status-icon">🎤</span>
+                <span class="status-text">เสียง: ปิด</span>
+            </div>
+            <div class="status-item" id="selectedStatus">
+                <span class="status-icon">📱</span>
+                <span class="status-text">เลือก: ไม่มี</span>
+            </div>
+        </div>
+
+        <div class="hand-cursor" id="handCursor"></div>
+        
+        <div id="loading">
+            <div class="spinner"></div>
+            <div style="font-size: 18px; color: white;">กำลังโหลด...</div>
+        </div>
+
+        <div class="instructions" id="instructions">
+            <h2>🎮 วิธีใช้งาน</h2>
+            <p><strong>🤏 จีบมือ</strong> (นิ้วโป้ง + นิ้วชี้) = เลือกแอป</p>
+            <p><strong>✊ กำมือ</strong> (ทำหมัด) = เปิดไมค์และพูดชื่อแอป</p>
+            <p><strong>✋ เปิดมือ</strong> = เลื่อนเคอร์เซอร์</p>
+            <p style="margin-top: 20px; color: #ffff00;">💡 เคล็ดลับ: จีบมือเมื่อเคอร์เซอร์อยู่เหนือแอปที่ต้องการ<br>หรือกำมือแล้วพูดชื่อแอป</p>
+            <button onclick="closeInstructions()">เริ่มใช้งาน</button>
+        </div>
+
+        <div class="voice-feedback" id="voiceFeedback"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <script>
+        const apps = [
+            { name: 'YouTube', icon: '📺', androidPackage: 'com.google.android.youtube', iosScheme: 'youtube://', url: 'https://www.youtube.com', keywords: ['youtube', 'ยูทูป', 'ยูทูบ', 'วิดีโอ'] },
+            { name: 'Netflix', icon: '🎬', androidPackage: 'com.netflix.mediaclient', iosScheme: 'nflx://', url: 'https://www.netflix.com', keywords: ['netflix', 'เน็ตฟลิกซ์', 'เน็ตฟลิก', 'หนัง'] },
+            { name: 'TikTok', icon: '🎵', androidPackage: 'com.zhiliaoapp.musically', iosScheme: 'snssdk1233://', url: 'https://www.tiktok.com', keywords: ['tiktok', 'ติ๊กต๊อก', 'ติกต๊อก'] },
+            { name: 'Messenger', icon: '💬', androidPackage: 'com.facebook.orca', iosScheme: 'fb-messenger://', url: 'https://www.messenger.com', keywords: ['messenger', 'เมสเซนเจอร์', 'เมสเซ็น', 'แชท'] },
+            { name: 'Facebook', icon: '👥', androidPackage: 'com.facebook.katana', iosScheme: 'fb://', url: 'https://www.facebook.com', keywords: ['facebook', 'เฟซบุ๊ก', 'เฟสบุ๊ค', 'เฟสบุ๊ก', 'เฟส'] },
+            { name: 'Instagram', icon: '📷', androidPackage: 'com.instagram.android', iosScheme: 'instagram://', url: 'https://www.instagram.com', keywords: ['instagram', 'อินสตาแกรม', 'อินสตา', 'ig', 'ไอจี'] },
+            { name: 'Twitter', icon: '🐦', androidPackage: 'com.twitter.android', iosScheme: 'twitter://', url: 'https://www.twitter.com', keywords: ['twitter', 'ทวิตเตอร์', 'ทวิตเตอ', 'x', 'เอ็กซ์'] },
+            { name: 'Spotify', icon: '🎧', androidPackage: 'com.spotify.music', iosScheme: 'spotify://', url: 'https://www.spotify.com', keywords: ['spotify', 'สปอตติฟาย', 'สปอติฟาย', 'เพลง'] },
+            { name: 'LINE', icon: '💚', androidPackage: 'jp.naver.line.android', iosScheme: 'line://', url: 'https://line.me', keywords: ['line', 'ไลน์'] },
+            { name: 'WhatsApp', icon: '📱', androidPackage: 'com.whatsapp', iosScheme: 'whatsapp://', url: 'https://www.whatsapp.com', keywords: ['whatsapp', 'วอทแอพ', 'วอทส์แอพ'] },
+            { name: 'Gmail', icon: '📧', androidPackage: 'com.google.android.gm', iosScheme: 'googlegmail://', url: 'https://mail.google.com', keywords: ['gmail', 'จีเมล', 'เมล'] },
+            { name: 'Google Maps', icon: '🗺️', androidPackage: 'com.google.android.apps.maps', iosScheme: 'comgooglemaps://', url: 'https://maps.google.com', keywords: ['maps', 'แมพ', 'แผนที่'] }
+        ];
+
+        const appGrid = document.getElementById('appGrid');
+        const handCanvas = document.getElementById('handCanvas');
+        const handCtx = handCanvas.getContext('2d');
+        const webcam = document.getElementById('webcam');
+        const handStatus = document.getElementById('handStatus');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const selectedStatus = document.getElementById('selectedStatus');
+        const loading = document.getElementById('loading');
+        const handCursor = document.getElementById('handCursor');
+        const voiceFeedback = document.getElementById('voiceFeedback');
+        const timeDisplay = document.getElementById('timeDisplay');
+
+        handCanvas.width = 200;
+        handCanvas.height = 150;
+
+        let handPosition = { x: 0, y: 0 };
+        let isPinching = false;
+        let isFist = false;
+        let handDetected = false;
+        let recognition = null;
+        let isListening = false;
+        let selectedApp = null;
+
+        function closeInstructions() {
+            document.getElementById('instructions').style.display = 'none';
+        }
+
+        apps.forEach((app, index) => {
+            const card = document.createElement('div');
+            card.className = 'app-card';
+            card.dataset.index = index;
+            card.innerHTML = `<div class="app-icon">${app.icon}</div><div class="app-name">${app.name}</div>`;
+            card.onclick = () => openApp(app);
+            appGrid.appendChild(card);
+        });
+
+        function updateTime() {
+            const now = new Date();
+            timeDisplay.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        function openApp(app) {
+            showVoiceFeedback(`กำลังเปิด ${app.name}...`);
+            
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            if (isAndroid) {
+                window.location.href = `intent://#Intent;scheme=https;package=${app.androidPackage};end`;
+                setTimeout(() => window.open(app.url, '_blank'), 2000);
+            } else if (isIOS) {
+                window.location.href = app.iosScheme;
+                setTimeout(() => window.open(app.url, '_blank'), 1000);
+            } else {
+                window.open(app.url, '_blank');
+            }
+        }
+
+        function showVoiceFeedback(text) {
+            voiceFeedback.textContent = text;
+            voiceFeedback.classList.add('show');
+            setTimeout(() => voiceFeedback.classList.remove('show'), 2500);
+        }
+
+        function distance(point1, point2) {
+            const dx = point1.x - point2.x;
+            const dy = point1.y - point2.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function isPinchGesture(landmarks) {
+            return distance(landmarks[4], landmarks[8]) < 0.05;
+        }
+
+        function isFistGesture(landmarks) {
+            const palm = landmarks[0];
+            let closedFingers = [8, 12, 16, 20].filter(tip => distance(landmarks[tip], palm) < 0.12).length;
+            if (distance(landmarks[4], palm) < 0.15) closedFingers++;
+            return closedFingers >= 4;
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        hands.onResults(onResults);
+
+        function onResults(results) {
+            handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                handDetected = true;
+                const landmarks = results.multiHandLandmarks[0];
+
+                drawConnectors(handCtx, landmarks, HAND_CONNECTIONS, { color: '#00ff00', lineWidth: 2 });
+                drawLandmarks(handCtx, landmarks, { color: '#ff00ff', fillColor: '#00ff00', radius: 2 });
+
+                const indexTip = landmarks[8];
+                handPosition.x = (1 - indexTip.x) * window.innerWidth;
+                handPosition.y = indexTip.y * window.innerHeight;
+
+                handCursor.classList.add('active');
+                handCursor.style.left = handPosition.x + 'px';
+                handCursor.style.top = handPosition.y + 'px';
+
+                const wasPinching = isPinching;
+                const wasFist = isFist;
+                
+                isPinching = isPinchGesture(landmarks);
+                isFist = isFistGesture(landmarks);
+
+                if (isPinching && !wasPinching) {
+                    selectAppUnderCursor();
+                    handCursor.classList.add('pinch');
+                    handCursor.classList.remove('fist');
+                } else if (!isPinching && wasPinching) {
+                    handCursor.classList.remove('pinch');
+                }
+
+                if (isFist && !wasFist && !isListening) {
+                    startVoiceRecognition();
+                    handCursor.classList.add('fist');
+                    handCursor.classList.remove('pinch');
+                } else if (!isFist && wasFist && isListening) {
+                    stopVoiceRecognition();
+                    handCursor.classList.remove('fist');
+                }
+
+                if (!isPinching && !isFist) {
+                    checkAppHover();
+                    handCursor.classList.remove('pinch', 'fist');
+                }
+
+                let statusText = isPinching ? 'มือ: จีบ 🤏' : isFist ? 'มือ: กำมือ ✊' : 'มือ: เปิด ✋';
+                handStatus.querySelector('.status-text').textContent = statusText;
+                handStatus.classList.add('active');
+            } else {
+                handDetected = false;
+                handCursor.classList.remove('active');
+                handStatus.querySelector('.status-text').textContent = 'มือ: ไม่พบ';
+                handStatus.classList.remove('active');
+                document.querySelectorAll('.app-card').forEach(card => card.classList.remove('hover'));
+            }
+        }
+
+        function selectAppUnderCursor() {
+            const cards = document.querySelectorAll('.app-card');
+            let found = false;
+            
+            cards.forEach((card, index) => {
+                const rect = card.getBoundingClientRect();
+                if (handPosition.x >= rect.left && handPosition.x <= rect.right &&
+                    handPosition.y >= rect.top && handPosition.y <= rect.bottom) {
+                    
+                    cards.forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedApp = apps[index];
+                    found = true;
+                    
+                    selectedStatus.querySelector('.status-text').textContent = `เลือก: ${selectedApp.name}`;
+                    selectedStatus.classList.add('active');
+                    showVoiceFeedback(`✅ เลือก ${selectedApp.name}`);
+                    
+                    setTimeout(() => {
+                        if (selectedApp === apps[index]) openApp(selectedApp);
+                    }, 1000);
+                }
+            });
+            
+            if (!found) showVoiceFeedback('❌ ไม่มีแอปที่ตำแหน่งนี้');
+        }
+
+        function checkAppHover() {
+            const cards = document.querySelectorAll('.app-card');
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                if (handPosition.x >= rect.left && handPosition.x <= rect.right &&
+                    handPosition.y >= rect.top && handPosition.y <= rect.bottom) {
+                    if (!card.classList.contains('selected')) card.classList.add('hover');
+                } else {
+                    card.classList.remove('hover');
+                }
+            });
+        }
+
+        function startVoiceRecognition() {
+            if (!('webkitSpeechRecognition' in window)) {
+                showVoiceFeedback('❌ เบราว์เซอร์ไม่รองรับการรับรู้เสียง');
+                return;
+            }
+            if (isListening) return;
+
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'th-TH';
+
+            recognition.onstart = () => {
+                isListening = true;
+                voiceStatus.querySelector('.status-text').textContent = 'เสียง: กำลังฟัง...';
+                voiceStatus.classList.add('listening');
+                showVoiceFeedback('🎤 กำลังฟัง... พูดชื่อแอป');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript.toLowerCase();
+                console.log('Heard:', transcript);
+                processVoiceCommand(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech error:', event.error);
+                if (event.error === 'no-speech') showVoiceFeedback('❌ ไม่ได้ยินเสียง');
+                stopVoiceRecognition();
+            };
+
+            recognition.onend = () => stopVoiceRecognition();
+
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error('Error starting recognition:', error);
+                stopVoiceRecognition();
+            }
+        }
+
+        function stopVoiceRecognition() {
+            isListening = false;
+            voiceStatus.querySelector('.status-text').textContent = 'เสียง: ปิด';
+            voiceStatus.classList.remove('listening');
+            if (recognition) {
+                try { recognition.stop(); } catch (error) {}
+            }
+        }
+
+        function processVoiceCommand(transcript) {
+            for (const app of apps) {
+                for (const keyword of app.keywords) {
+                    if (transcript.includes(keyword)) {
+                        document.querySelectorAll('.app-card').forEach(c => c.classList.remove('selected'));
+                        const index = apps.indexOf(app);
+                        document.querySelectorAll('.app-card')[index].classList.add('selected');
+                        
+                        selectedApp = app;
+                        selectedStatus.querySelector('.status-text').textContent = `เลือก: ${app.name}`;
+                        selectedStatus.classList.add('active');
+                        openApp(app);
+                        return;
+                    }
+                }
+            }
+            showVoiceFeedback('❌ ไม่พบแอปที่ต้องการ');
+        }
+
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' }
+                });
+                
+                webcam.srcObject = stream;
+                webcam.addEventListener('loadeddata', () => loading.style.display = 'none');
+
+                return new Camera(webcam, {
+                    onFrame: async () => await hands.send({ image: webcam }),
+                    width: 640,
+                    height: 480
+                });
+            } catch (error) {
+                console.error('Camera error:', error);
+                loading.innerHTML = '<div style="color: white; font-size: 18px; padding: 20px;">❌ ไม่สามารถเข้าถึงกล้องได้<br><br>กรุณาอนุญาตการใช้กล้อง</div>';
+            }
+        }
+
+        setupCamera().then(camera => { if (camera) camera.start(); });
+    </script>
+</body>
+</html>
