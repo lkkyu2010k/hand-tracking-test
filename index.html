@@ -242,7 +242,7 @@
             height: 30px;
         }
 
-        .hand-cursor.fist {
+        .hand-cursor.two-fingers {
             border-color: #ff00ff;
             background: rgba(255, 0, 255, 0.3);
             box-shadow: 0 0 30px rgba(255, 0, 255, 0.8);
@@ -445,9 +445,9 @@
         <div class="instructions" id="instructions">
             <h2>🎮 วิธีใช้งาน</h2>
             <p><strong>🤏 จีบมือ</strong> (นิ้วโป้ง + นิ้วชี้) = เลือกแอป</p>
-            <p><strong>✊ กำมือ</strong> (ทำหมัด) = เปิดไมค์และพูดชื่อแอป</p>
+            <p><strong>✌️ ชู 2 นิ้ว</strong> (นิ้วชี้ + นิ้วกลาง) = เปิดไมค์และพูดชื่อแอป</p>
             <p><strong>✋ เปิดมือ</strong> = เลื่อนเคอร์เซอร์</p>
-            <p style="margin-top: 20px; color: #ffff00;">💡 เคล็ดลับ: จีบมือเมื่อเคอร์เซอร์อยู่เหนือแอปที่ต้องการ<br>หรือกำมือแล้วพูดชื่อแอป</p>
+            <p style="margin-top: 20px; color: #ffff00;">💡 เคล็ดลับ: จีบมือเมื่อเคอร์เซอร์อยู่เหนือแอปที่ต้องการ<br>หรือชู 2 นิ้วแล้วพูดชื่อแอป</p>
             <button onclick="closeInstructions()">เริ่มใช้งาน</button>
         </div>
 
@@ -491,7 +491,7 @@
 
         let handPosition = { x: 0, y: 0 };
         let isPinching = false;
-        let isFist = false;
+        let isTwoFingers = false;
         let handDetected = false;
         let recognition = null;
         let isListening = false;
@@ -550,11 +550,23 @@
             return distance(landmarks[4], landmarks[8]) < 0.05;
         }
 
-        function isFistGesture(landmarks) {
+        function isTwoFingerGesture(landmarks) {
+            // Check if index and middle fingers are extended, others are closed
             const palm = landmarks[0];
-            let closedFingers = [8, 12, 16, 20].filter(tip => distance(landmarks[tip], palm) < 0.12).length;
-            if (distance(landmarks[4], palm) < 0.15) closedFingers++;
-            return closedFingers >= 4;
+            const wrist = landmarks[0];
+            
+            // Check index finger (8) and middle finger (12) are extended
+            const indexExtended = landmarks[8].y < landmarks[6].y; // Tip above knuckle
+            const middleExtended = landmarks[12].y < landmarks[10].y;
+            
+            // Check ring and pinky are closed
+            const ringClosed = distance(landmarks[16], palm) < 0.15;
+            const pinkyClosed = distance(landmarks[20], palm) < 0.15;
+            
+            // Check thumb is closed or neutral
+            const thumbClosed = distance(landmarks[4], palm) < 0.2;
+            
+            return indexExtended && middleExtended && ringClosed && pinkyClosed;
         }
 
         const hands = new Hands({
@@ -589,34 +601,34 @@
                 handCursor.style.top = handPosition.y + 'px';
 
                 const wasPinching = isPinching;
-                const wasFist = isFist;
+                const wasTwoFingers = isTwoFingers;
                 
                 isPinching = isPinchGesture(landmarks);
-                isFist = isFistGesture(landmarks);
+                isTwoFingers = isTwoFingerGesture(landmarks);
 
                 if (isPinching && !wasPinching) {
                     selectAppUnderCursor();
                     handCursor.classList.add('pinch');
-                    handCursor.classList.remove('fist');
+                    handCursor.classList.remove('two-fingers');
                 } else if (!isPinching && wasPinching) {
                     handCursor.classList.remove('pinch');
                 }
 
-                if (isFist && !wasFist && !isListening) {
+                if (isTwoFingers && !wasTwoFingers && !isListening) {
                     startVoiceRecognition();
-                    handCursor.classList.add('fist');
+                    handCursor.classList.add('two-fingers');
                     handCursor.classList.remove('pinch');
-                } else if (!isFist && wasFist && isListening) {
+                } else if (!isTwoFingers && wasTwoFingers && isListening) {
                     stopVoiceRecognition();
-                    handCursor.classList.remove('fist');
+                    handCursor.classList.remove('two-fingers');
                 }
 
-                if (!isPinching && !isFist) {
+                if (!isPinching && !isTwoFingers) {
                     checkAppHover();
-                    handCursor.classList.remove('pinch', 'fist');
+                    handCursor.classList.remove('pinch', 'two-fingers');
                 }
 
-                let statusText = isPinching ? 'มือ: จีบ 🤏' : isFist ? 'มือ: กำมือ ✊' : 'มือ: เปิด ✋';
+                let statusText = isPinching ? 'มือ: จีบ 🤏' : isTwoFingers ? 'มือ: ชู 2 นิ้ว ✌️' : 'มือ: เปิด ✋';
                 handStatus.querySelector('.status-text').textContent = statusText;
                 handStatus.classList.add('active');
             } else {
@@ -695,7 +707,7 @@
 
             recognition.onerror = (event) => {
                 console.error('Speech error:', event.error);
-                if (event.error === 'no-speech') showVoiceFeedback('❌ ไม่ได้ยินเสียงเลย');
+                if (event.error === 'no-speech') showVoiceFeedback('❌ ไม่ได้ยินเสียง');
                 stopVoiceRecognition();
             };
 
