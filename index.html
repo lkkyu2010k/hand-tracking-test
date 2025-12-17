@@ -695,7 +695,7 @@
 
             recognition.onerror = (event) => {
                 console.error('Speech error:', event.error);
-                if (event.error === 'no-speech') showVoiceFeedback('❌ ไม่ได้ยินเสียง');
+                if (event.error === 'no-speech') showVoiceFeedback('❌ ไม่ได้ยินเสียงเลย');
                 stopVoiceRecognition();
             };
 
